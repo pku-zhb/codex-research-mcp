@@ -14,9 +14,10 @@ from typing import Any, Callable
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_NAME = "codex-research-mcp"
-SERVER_VERSION = "0.1.0"
+SERVER_VERSION = "0.1.1"
 DEFAULT_STATE_DIR = Path(tempfile.gettempdir()) / SERVER_NAME
 THREAD_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{10,128}$")
+DEFAULT_UPSTREAM_STREAM_LIMIT_BYTES = 32 * 1024 * 1024
 
 RESEARCH_TOOL = {
     "name": "research",
@@ -107,19 +108,31 @@ class UpstreamError(RuntimeError):
 class CodexMcpClient:
     """Minimal asynchronous JSON-RPC client for `codex mcp-server`."""
 
-    def __init__(self, command: str, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        command: str,
+        timeout_seconds: float,
+        stream_limit_bytes: int = DEFAULT_UPSTREAM_STREAM_LIMIT_BYTES,
+    ) -> None:
         self.command = command
         self.timeout_seconds = timeout_seconds
+        self.stream_limit_bytes = stream_limit_bytes
         self.process: asyncio.subprocess.Process | None = None
         self.pending: dict[int, asyncio.Future[dict[str, Any]]] = {}
         self.next_id = 1
         self.write_lock = asyncio.Lock()
         self.stdout_task: asyncio.Task[None] | None = None
         self.stderr_task: asyncio.Task[None] | None = None
+        self.stdout_error: BaseException | None = None
 
     @property
     def is_running(self) -> bool:
-        return self.process is not None and self.process.returncode is None
+        return (
+            self.process is not None
+            and self.process.returncode is None
+            and self.stdout_task is not None
+            and not self.stdout_task.done()
+        )
 
     async def start(self) -> None:
         if self.is_running:
@@ -130,7 +143,9 @@ class CodexMcpClient:
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            limit=self.stream_limit_bytes,
         )
+        self.stdout_error = None
         self.stdout_task = asyncio.create_task(self._read_stdout())
         self.stderr_task = asyncio.create_task(self._relay_stderr())
         try:
@@ -151,6 +166,7 @@ class CodexMcpClient:
 
     async def _read_stdout(self) -> None:
         assert self.process is not None and self.process.stdout is not None
+        failure_message: str | None = None
         try:
             while line := await self.process.stdout.readline():
                 try:
@@ -163,11 +179,23 @@ class CodexMcpClient:
                 future = self.pending.pop(message_id)
                 if not future.done():
                     future.set_result(message)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self.stdout_error = error
+            failure_message = (
+                "Codex MCP stdout reader failed; a JSON-RPC line may have exceeded "
+                f"the configured {self.stream_limit_bytes}-byte stream limit: "
+                f"{type(error).__name__}: {error}"
+            )
+            print(failure_message, file=sys.stderr, flush=True)
         finally:
-            error = UpstreamError("Codex MCP server closed its output stream")
+            failure_message = failure_message or (
+                "Codex MCP server closed its output stream"
+            )
             for future in self.pending.values():
                 if not future.done():
-                    future.set_exception(error)
+                    future.set_exception(UpstreamError(failure_message))
             self.pending.clear()
 
     async def _relay_stderr(self) -> None:
@@ -233,16 +261,44 @@ class CodexMcpClient:
     async def close(self) -> None:
         if self.process is None:
             return
-        if self.process.stdin is not None and not self.process.stdin.is_closing():
-            self.process.stdin.close()
+        process = self.process
+        stdin = process.stdin
+        if stdin is not None and not stdin.is_closing():
+            stdin.close()
         try:
-            await asyncio.wait_for(self.process.wait(), timeout=3)
+            await asyncio.wait_for(process.wait(), timeout=3)
         except asyncio.TimeoutError:
-            self.process.terminate()
-            await self.process.wait()
-        for task in (self.stdout_task, self.stderr_task):
-            if task is not None:
-                await task
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                await asyncio.wait_for(process.wait(), timeout=3)
+            except asyncio.TimeoutError:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.wait()
+        tasks = [
+            task
+            for task in (self.stdout_task, self.stderr_task)
+            if task is not None
+        ]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        if stdin is not None:
+            try:
+                await stdin.wait_closed()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+        transport = getattr(process, "_transport", None)
+        if transport is not None:
+            transport.close()
+        self.process = None
+        self.stdout_task = None
+        self.stderr_task = None
+        await asyncio.sleep(0)
 
 
 UpstreamFactory = Callable[[], CodexMcpClient]
