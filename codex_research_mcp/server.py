@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_NAME = "codex-research-mcp"
-SERVER_VERSION = "0.1.1"
+SERVER_VERSION = "0.1.2"
 DEFAULT_STATE_DIR = Path(tempfile.gettempdir()) / SERVER_NAME
 THREAD_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{10,128}$")
 DEFAULT_UPSTREAM_STREAM_LIMIT_BYTES = 32 * 1024 * 1024
@@ -23,10 +23,10 @@ RESEARCH_TOOL = {
     "name": "research",
     "title": "Codex Research",
     "description": (
-        "Delegate one bounded, read-only research assignment to Codex. The real "
-        "source tree stays read-only; downloads, scripts, and intermediate files "
-        "are confined to a private temporary scratch directory. Independent calls "
-        "may run concurrently."
+        "Delegate one read-only research assignment to Codex. It may be exploratory, "
+        "analytical, adversarial, or tightly scoped. The real source tree stays "
+        "read-only; downloads, scripts, and intermediate files are confined to a "
+        "private temporary scratch directory. Independent calls may run concurrently."
     ),
     "inputSchema": {
         "type": "object",
@@ -387,10 +387,11 @@ Safety and ownership boundaries:
 - Resolve relative source references against the source root above.
 
 Research role:
-- Complete only the bounded assignment in the user prompt.
-- Return a compact evidence packet with exact URLs or absolute local paths, source dates, confidence, conflicts, and gaps.
+- Follow the assignment in the user prompt and exercise research judgment within its intent.
+- Support evidence collection, analysis, counterarguments, alternative interpretations, structures, or draft options when requested.
+- Keep the response compact enough for a lead researcher to review efficiently, while preserving material reasoning, counterevidence, uncertainty, and traceable sources.
 - Prefer original sources. You are not yourself a source.
-- Do not write the lead researcher's thesis, recommendation, outline, or final report prose.
+- Do not edit the durable deliverable or claim final authority; the lead researcher owns the final judgment and authorship.
 """
 
     @staticmethod
