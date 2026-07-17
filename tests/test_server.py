@@ -89,10 +89,9 @@ class ResearchServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn(str(self.source), arguments["developer-instructions"])
         self.assertIn(str(scratch), arguments["developer-instructions"])
-        self.assertIn(
-            "alternative interpretations", arguments["developer-instructions"]
-        )
-        self.assertIn("lead researcher owns", arguments["developer-instructions"])
+        self.assertIn("extract, organize", arguments["developer-instructions"])
+        self.assertIn("Do not take over", arguments["developer-instructions"])
+        self.assertIn("lead researcher owns research direction", arguments["developer-instructions"])
         marker = self.service.thread_root / f"{THREAD_ID}.json"
         self.assertEqual(json.loads(marker.read_text())["scratchDir"], str(scratch))
 
@@ -245,7 +244,7 @@ class CodexMcpClientTests(unittest.IsolatedAsyncioTestCase):
 class ToolSchemaTests(unittest.TestCase):
     def test_both_tools_are_marked_concurrency_safe(self) -> None:
         self.assertEqual([tool["name"] for tool in TOOLS], ["research", "research_reply"])
-        self.assertIn("exploratory", TOOLS[0]["description"])
+        self.assertIn("evidence assignment", TOOLS[0]["description"])
         for tool in TOOLS:
             self.assertIs(tool["annotations"]["readOnlyHint"], True)
             self.assertIs(tool["annotations"]["destructiveHint"], False)

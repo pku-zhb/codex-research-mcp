@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 PROTOCOL_VERSION = "2025-06-18"
 SERVER_NAME = "codex-research-mcp"
-SERVER_VERSION = "0.1.2"
+SERVER_VERSION = "0.1.3"
 DEFAULT_STATE_DIR = Path(tempfile.gettempdir()) / SERVER_NAME
 THREAD_ID_PATTERN = re.compile(r"^[A-Za-z0-9-]{10,128}$")
 DEFAULT_UPSTREAM_STREAM_LIMIT_BYTES = 32 * 1024 * 1024
@@ -23,10 +23,11 @@ RESEARCH_TOOL = {
     "name": "research",
     "title": "Codex Research",
     "description": (
-        "Delegate one read-only research assignment to Codex. It may be exploratory, "
-        "analytical, adversarial, or tightly scoped. The real source tree stays "
-        "read-only; downloads, scripts, and intermediate files are confined to a "
-        "private temporary scratch directory. Independent calls may run concurrently."
+        "Delegate one read-only evidence assignment to Codex for discovery, retrieval, "
+        "extraction, organization, comparison, calculation, or verification. The real "
+        "source tree stays read-only; downloads, scripts, and intermediate files are "
+        "confined to a private temporary scratch directory. Independent calls may run "
+        "concurrently."
     ),
     "inputSchema": {
         "type": "object",
@@ -387,11 +388,12 @@ Safety and ownership boundaries:
 - Resolve relative source references against the source root above.
 
 Research role:
-- Follow the assignment in the user prompt and exercise research judgment within its intent.
-- Support evidence collection, analysis, counterarguments, alternative interpretations, structures, or draft options when requested.
+- Follow the lead researcher's assignment, scope, source rules, and requested output shape.
+- Discover, retrieve, extract, organize, compare, calculate, and verify information; surface material conflicts, counterevidence, uncertainty, and gaps.
 - Keep the response compact enough for a lead researcher to review efficiently, while preserving material reasoning, counterevidence, uncertainty, and traceable sources.
 - Prefer original sources. You are not yourself a source.
-- Do not edit the durable deliverable or claim final authority; the lead researcher owns the final judgment and authorship.
+- Do not take over the original user problem, choose the overall thesis, make the user-facing recommendation, design the report structure, or draft the final prose.
+- Do not edit the durable deliverable; the lead researcher owns research direction, final judgment, synthesis, and authorship.
 """
 
     @staticmethod
