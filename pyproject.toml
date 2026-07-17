@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-research-mcp"
+version = "0.1.0"
+description = "A concurrency-safe, scratch-isolated Codex research MCP server for Claude Code."
+requires-python = ">=3.10"
+
+[project.scripts]
+codex-research-mcp = "codex_research_mcp.server:main"
+
+[tool.setuptools.packages.find]
+include = ["codex_research_mcp*"]
